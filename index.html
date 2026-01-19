@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Evidence-Based Health Plan — Reminder Calendar</title>
+<style>
+:root{
+  --bg:#0f1115;
+  --panel:#151923;
+  --text:#e9eef7;
+  --dim:#9aa6b2;
+  --line:#273043;
+  --accent:#9b5cff;
+  --ok:#10b981;
+  --sans:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  line-height:1.4;
+  padding:20px;
+  display:flex;
+  justify-content:center;
+}
+
+.container{
+  width:100%;
+  max-width:600px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+
+h1{
+  margin:0 0 8px;
+  font-size:1.3rem;
+  color:#dfe7ff;
+}
+.subtitle{
+  color:var(--dim);
+  font-size:0.9rem;
+  margin-bottom:20px;
+}
+
+.item-list{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+.item{
+  background:rgba(39,48,67,.3);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  transition:border-color .2s;
+}
+.item:hover{
+  border-color:var(--accent);
+}
+.chk-wrap{
+  padding-top:2px;
+}
+.chk{
+  width:20px; height:20px;
+  accent-color:var(--accent);
+  cursor:pointer;
+}
+
+.details{
+  flex:1;
+}
+.item-head{
+  font-weight:700;
+  color:#fff;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.item-edit{
+  font-size:0.8rem;
+  color:var(--accent);
+  cursor:pointer;
+  background:none; border:none; padding:0;
+  text-decoration:underline;
+}
+
+.field-row{
+  margin-top:8px;
+  display:flex; gap:8px;
+}
+input[type=text]{
+  background:rgba(0,0,0,0.3);
+  border:1px solid var(--line);
+  color:var(--dim);
+  padding:6px 8px;
+  border-radius:6px;
+  font-size:0.85rem;
+  width:100%;
+  font-family:var(--sans);
+}
+input[type=text]:focus{
+  outline:none;
+  border-color:var(--accent);
+  color:#fff;
+}
+
+.actions{
+  margin-top:24px;
+  padding-top:16px;
+  border-top:1px solid var(--line);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+button.primary{
+  background:linear-gradient(135deg, rgba(155,92,255,.95), rgba(102,217,239,.6));
+  color:#fff;
+  border:none;
+  border-radius:12px;
+  padding:14px;
+  font-size:1rem;
+  font-weight:700;
+  cursor:pointer;
+  width:100%;
+}
+button.primary:hover{ filter:brightness(1.1); }
+button.primary:active{ transform:translateY(1px); }
+
+.info-box{
+  background:rgba(16,185,129,.1);
+  border:1px solid rgba(16,185,129,.3);
+  color:var(--ok);
+  padding:10px;
+  border-radius:8px;
+  font-size:0.85rem;
+  margin-top:12px;
+  display:none;
+  text-align:center;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Health Reminders</h1>
+  <div class="subtitle">
+    Based on your inputs, here are suggested appointments to schedule.
+    Customize the placeholder numbers below, then <b>Download</b> to add to your calendar.
+  </div>
+
+  <div class="item-list" id="list">
+    <!-- Items injected by JS -->
+    <div style="padding:20px;text-align:center;color:var(--dim)">Loading...</div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="btn_download">Download Calendar (.ics)</button>
+    <div id="msg" class="info-box">File downloaded! Open it to add events to your calendar.</div>
+  </div>
+</div>
+
+<script>
+// Available Reminders Dictionary
+const REMINDERS = {
+  colon: {
+    title: "Colon Cancer Screening",
+    note: "Discuss options (Colonoscopy vs Stool test).",
+    phone: "555-0199 (GI Dept)"
+  },
+  mammo: {
+    title: "Mammogram Screening",
+    note: "Standard screening mammogram.",
+    phone: "555-0142 (Radiology)"
+  },
+  psa: {
+    title: "Prostate Screening (PSA)",
+    note: "Blood draw for PSA (shared decision).",
+    phone: "555-0100 (Lab/PCP)"
+  },
+  pap: {
+    title: "Cervical Screening (Pap/HPV)",
+    note: "Pap smear and/or HPV co-testing.",
+    phone: "555-0188 (Ob/Gyn)"
+  },
+  eye: {
+    title: "Comprehensive Eye Exam",
+    note: "Dilated eye exam (Retina check).",
+    phone: "555-0123 (Ophthalmology)"
+  },
+  dentist: {
+    title: "Dental Cleaning & Exam",
+    note: "Routine 6-month cleaning.",
+    phone: "555-0177 (Dentist)"
+  },
+  wellness: {
+    title: "Annual Wellness Visit",
+    note: "General preventive exam & vitals check.",
+    phone: "555-0111 (Primary Care)"
+  },
+  a1c: {
+    title: "Diabetes Screening (HbA1c)",
+    note: "Fasting bloodwork or A1c check.",
+    phone: "555-0100 (Lab)"
+  },
+  dexa: {
+    title: "Bone Density Scan (DEXA)",
+    note: "Screening for osteoporosis.",
+    phone: "555-0142 (Radiology)"
+  },
+  lung: {
+    title: "Lung Cancer Screening (LDCT)",
+    note: "Low-dose CT scan (requires shared decision).",
+    phone: "555-0142 (Radiology)"
+  }
+};
+
+const $ = (id) => document.getElementById(id);
+
+function getParams(){
+  return new URLSearchParams(window.location.search);
+}
+
+function render(){
+  const params = getParams();
+  const list = $("list");
+  list.innerHTML = "";
+
+  let foundAny = false;
+
+  // Check which keys are present in URL
+  Object.keys(REMINDERS).forEach(key => {
+    if(params.has(key)){
+      foundAny = true;
+      const data = REMINDERS[key];
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        <div class="chk-wrap">
+          <input type="checkbox" class="chk" id="chk_${key}" checked />
+        </div>
+        <div class="details">
+          <div class="item-head">
+            <span>${data.title}</span>
+          </div>
+          <div class="field-row">
+            <input type="text" id="note_${key}" value="${data.note}" aria-label="Note" />
+          </div>
+          <div class="field-row">
+            <input type="text" id="phone_${key}" value="${data.phone}" aria-label="Phone" />
+          </div>
+        </div>
+      `;
+      list.appendChild(div);
+    }
+  });
+
+  if(!foundAny){
+    list.innerHTML = `<div style="padding:20px;text-align:center;color:#9aa6b2">
+      No specific reminders detected in the link. <br/>
+      Try generating the link again from the main app.
+    </div>`;
+    $("btn_download").disabled = true;
+  }
+}
+
+function generateICS(){
+  const events = [];
+  
+  Object.keys(REMINDERS).forEach(key => {
+    const chk = $(`chk_${key}`);
+    if(chk && chk.checked){
+      const title = REMINDERS[key].title;
+      const note = $(`note_${key}`).value;
+      const phone = $(`phone_${key}`).value;
+      
+      // Create a VEVENT block
+      // We set the date to tomorrow at 9AM as a placeholder
+      const now = new Date();
+      now.setDate(now.getDate() + 1); // tomorrow
+      
+      const y = now.getFullYear();
+      const m = String(now.getMonth()+1).padStart(2,'0');
+      const d = String(now.getDate()).padStart(2,'0');
+      const dtStart = `${y}${m}${d}T090000`;
+      const dtEnd   = `${y}${m}${d}T100000`;
+
+      const desc = `${note} \\nPhone to schedule: ${phone}`;
+      
+      events.push(`BEGIN:VEVENT
+SUMMARY:Schedule: ${title}
+DTSTART:${dtStart}
+DTEND:${dtEnd}
+DESCRIPTION:${desc}
+STATUS:CONFIRMED
+END:VEVENT`);
+    }
+  });
+
+  if(events.length === 0) return null;
+
+  return `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//EvidenceHealthPlan//ReminderCal//EN
+${events.join("\n")}
+END:VCALENDAR`;
+}
+
+function download(filename, text) {
+  const element = document.createElement('a');
+  element.setAttribute('href', 'data:text/calendar;charset=utf-8,' + encodeURIComponent(text));
+  element.setAttribute('download', filename);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
+
+$("btn_download").addEventListener("click", ()=>{
+  const icsData = generateICS();
+  if(!icsData){
+    alert("No items selected.");
+    return;
+  }
+  download("HealthReminders.ics", icsData);
+  $("msg").style.display = "block";
+});
+
+// Init
+render();
+</script>
+
+</body>
+</html>
