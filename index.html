@@ -50,6 +50,21 @@ h1{
   margin-bottom:20px;
 }
 
+.config-bar{
+  background:rgba(39,48,67,.4);
+  padding:12px;
+  border-radius:12px;
+  margin-bottom:16px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  font-size:0.9rem;
+}
+.config-bar input{
+  width:60px;
+  text-align:center;
+}
+
 .item-list{
   display:flex;
   flex-direction:column;
@@ -88,29 +103,36 @@ h1{
   justify-content:space-between;
   align-items:center;
 }
-.item-edit{
-  font-size:0.8rem;
+.item-badge{
+  font-size:0.75rem;
+  padding:2px 6px;
+  border-radius:4px;
+}
+.item-badge.med{
   color:var(--accent);
-  cursor:pointer;
-  background:none; border:none; padding:0;
-  text-decoration:underline;
+  background:rgba(155,92,255,0.1);
+}
+.item-badge.check{
+  color:var(--ok);
+  background:rgba(16,185,129,0.1);
 }
 
 .field-row{
   margin-top:8px;
   display:flex; gap:8px;
 }
-input[type=text]{
+input[type=text], input[type=number]{
   background:rgba(0,0,0,0.3);
   border:1px solid var(--line);
   color:var(--dim);
   padding:6px 8px;
   border-radius:6px;
   font-size:0.85rem;
-  width:100%;
   font-family:var(--sans);
 }
-input[type=text]:focus{
+input[type=text]{ width:100%; }
+
+input[type=text]:focus, input[type=number]:focus{
   outline:none;
   border-color:var(--accent);
   color:#fff;
@@ -157,8 +179,14 @@ button.primary:active{ transform:translateY(1px); }
 <div class="container">
   <h1>Health Reminders</h1>
   <div class="subtitle">
-    Based on your inputs, here are suggested appointments to schedule.
-    Customize the placeholder numbers below, then <b>Download</b> to add to your calendar.
+    Review your suggested plan below. Uncheck any items you don't need.<br/>
+    <b>Screenings</b> are staggered to avoid crowding a single day.
+  </div>
+
+  <div class="config-bar">
+    <label for="repeat_count">Remind me monthly for</label>
+    <input type="number" id="repeat_count" value="4" min="1" max="12" />
+    <span>months (screenings only)</span>
   </div>
 
   <div class="item-list" id="list">
@@ -174,56 +202,109 @@ button.primary:active{ transform:translateY(1px); }
 
 <script>
 // Available Reminders Dictionary
+// type: "check" (staggered, monthly count) | "med" (start tomorrow, infinite/daily)
+// rrule: optional "DAILY" | "WEEKLY" etc (for meds)
 const REMINDERS = {
   colon: {
     title: "Colon Cancer Screening",
     note: "Discuss options (Colonoscopy vs Stool test).",
-    phone: "555-0199 (GI Dept)"
+    phone: "555-0199 (GI Dept)",
+    type: "check"
   },
   mammo: {
     title: "Mammogram Screening",
     note: "Standard screening mammogram.",
-    phone: "555-0142 (Radiology)"
+    phone: "555-0142 (Radiology)",
+    type: "check"
   },
   psa: {
     title: "Prostate Screening (PSA)",
     note: "Blood draw for PSA (shared decision).",
-    phone: "555-0100 (Lab/PCP)"
+    phone: "555-0100 (Lab/PCP)",
+    type: "check"
   },
   pap: {
     title: "Cervical Screening (Pap/HPV)",
     note: "Pap smear and/or HPV co-testing.",
-    phone: "555-0188 (Ob/Gyn)"
+    phone: "555-0188 (Ob/Gyn)",
+    type: "check"
   },
   eye: {
-    title: "Comprehensive Eye Exam",
-    note: "Dilated eye exam (Retina check).",
-    phone: "555-0123 (Ophthalmology)"
+    title: "Eye Exam (Dilated/Retina)",
+    note: "Annual dilated eye exam (Retina check).",
+    phone: "555-0123 (Ophthalmology)",
+    type: "check"
   },
   dentist: {
     title: "Dental Cleaning & Exam",
     note: "Routine 6-month cleaning.",
-    phone: "555-0177 (Dentist)"
+    phone: "555-0177 (Dentist)",
+    type: "check"
   },
   wellness: {
     title: "Annual Wellness Visit",
     note: "General preventive exam & vitals check.",
-    phone: "555-0111 (Primary Care)"
+    phone: "555-0111 (Primary Care)",
+    type: "check"
   },
-  a1c: {
+  a1c_screen: {
     title: "Diabetes Screening (HbA1c)",
-    note: "Fasting bloodwork or A1c check.",
-    phone: "555-0100 (Lab)"
+    note: "Fasting bloodwork or A1c screening.",
+    phone: "555-0100 (Lab)",
+    type: "check"
+  },
+  labs_dm: {
+    title: "Diabetic Labs (A1c/Metabolic)",
+    note: "Quarterly or Bi-annual monitoring labs.",
+    phone: "555-0100 (Lab)",
+    type: "check"
+  },
+  uacr: {
+    title: "Urine Microalbumin (UACR)",
+    note: "Kidney health check (urine sample).",
+    phone: "555-0100 (Lab)",
+    type: "check"
   },
   dexa: {
     title: "Bone Density Scan (DEXA)",
     note: "Screening for osteoporosis.",
-    phone: "555-0142 (Radiology)"
+    phone: "555-0142 (Radiology)",
+    type: "check"
   },
   lung: {
     title: "Lung Cancer Screening (LDCT)",
     note: "Low-dose CT scan (requires shared decision).",
-    phone: "555-0142 (Radiology)"
+    phone: "555-0142 (Radiology)",
+    type: "check"
+  },
+  // Medications (Recurring)
+  meds_daily: {
+    title: "Daily AM Meds",
+    note: "Take daily morning medications.",
+    phone: "AM",
+    type: "med",
+    rrule: "DAILY"
+  },
+  meds_daily_pm: {
+    title: "Daily PM Meds",
+    note: "Take daily evening medications.",
+    phone: "PM",
+    type: "med",
+    rrule: "DAILY"
+  },
+  meds_weekly: {
+    title: "Weekly GLP-1 Injection",
+    note: "Take weekly GLP-1 (Ozempic/Wegovy etc).",
+    phone: "Weekly",
+    type: "med",
+    rrule: "WEEKLY"
+  },
+  meds_insulin: {
+    title: "Insulin Reminder",
+    note: "Check glucose & administer insulin.",
+    phone: "Daily",
+    type: "med",
+    rrule: "DAILY"
   }
 };
 
@@ -240,30 +321,51 @@ function render(){
 
   let foundAny = false;
 
+  // Helper to append item
+  const appendItem = (key, data) => {
+    foundAny = true;
+    const div = document.createElement("div");
+    div.className = "item";
+    
+    // Badge based on type
+    let badgeHtml = "";
+    if(data.type === "med") badgeHtml = `<span class="item-badge med">Med (${data.rrule})</span>`;
+    else badgeHtml = `<span class="item-badge check">To-Do</span>`;
+    
+    div.innerHTML = `
+      <div class="chk-wrap">
+        <input type="checkbox" class="chk" id="chk_${key}" checked />
+      </div>
+      <div class="details">
+        <div class="item-head">
+          <span>${data.title} ${badgeHtml}</span>
+        </div>
+        <div class="field-row">
+          <input type="text" id="note_${key}" value="${data.note}" aria-label="Note" />
+        </div>
+        <div class="field-row">
+          <input type="text" id="phone_${key}" value="${data.phone}" aria-label="Phone/Time" />
+        </div>
+      </div>
+    `;
+    list.appendChild(div);
+  };
+
   // Check which keys are present in URL
   Object.keys(REMINDERS).forEach(key => {
-    if(params.has(key)){
-      foundAny = true;
-      const data = REMINDERS[key];
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
-        <div class="chk-wrap">
-          <input type="checkbox" class="chk" id="chk_${key}" checked />
-        </div>
-        <div class="details">
-          <div class="item-head">
-            <span>${data.title}</span>
-          </div>
-          <div class="field-row">
-            <input type="text" id="note_${key}" value="${data.note}" aria-label="Note" />
-          </div>
-          <div class="field-row">
-            <input type="text" id="phone_${key}" value="${data.phone}" aria-label="Phone" />
-          </div>
-        </div>
-      `;
-      list.appendChild(div);
+    if(key === "meds_daily"){
+      if(params.has("meds_daily")){
+        appendItem("meds_daily", REMINDERS["meds_daily"]);
+        appendItem("meds_daily_pm", REMINDERS["meds_daily_pm"]);
+      }
+    } 
+    else if(key === "meds_daily_pm"){
+      // no-op (handled by meds_daily)
+    }
+    else {
+      if(params.has(key)){
+        appendItem(key, REMINDERS[key]);
+      }
     }
   });
 
@@ -278,35 +380,66 @@ function render(){
 
 function generateICS(){
   const events = [];
+  const monthlyCount = $("repeat_count").value || 4;
   
-  Object.keys(REMINDERS).forEach(key => {
-    const chk = $(`chk_${key}`);
-    if(chk && chk.checked){
-      const title = REMINDERS[key].title;
-      const note = $(`note_${key}`).value;
-      const phone = $(`phone_${key}`).value;
-      
-      // Create a VEVENT block
-      // We set the date to tomorrow at 9AM as a placeholder
-      const now = new Date();
-      now.setDate(now.getDate() + 1); // tomorrow
-      
-      const y = now.getFullYear();
-      const m = String(now.getMonth()+1).padStart(2,'0');
-      const d = String(now.getDate()).padStart(2,'0');
-      const dtStart = `${y}${m}${d}T090000`;
-      const dtEnd   = `${y}${m}${d}T100000`;
+  // Strategy: Stagger screenings by 1 day each so they don't pile up.
+  // Meds always start "Tomorrow".
+  let staggerOffset = 0;
 
-      const desc = `${note} \\nPhone to schedule: ${phone}`;
-      
-      events.push(`BEGIN:VEVENT
-SUMMARY:Schedule: ${title}
+  const checkboxes = document.querySelectorAll(".chk");
+  
+  checkboxes.forEach(chk => {
+    if(!chk.checked) return;
+    
+    const key = chk.id.replace("chk_", "");
+    const data = REMINDERS[key];
+    if(!data) return;
+
+    const note = $(`note_${key}`).value;
+    const phone = $(`phone_${key}`).value;
+    
+    const now = new Date();
+    // Start logic
+    if(data.type === "check"){
+      // Stagger: Tomorrow + offset
+      now.setDate(now.getDate() + 1 + staggerOffset);
+      staggerOffset++; // next screening item gets pushed another day
+    } else {
+      // Meds: Always start Tomorrow
+      now.setDate(now.getDate() + 1);
+    }
+    
+    const y = now.getFullYear();
+    const m = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+    
+    // Time logic
+    let hour = "09";
+    if(key.includes("pm")) hour = "21"; // 9 PM
+    
+    const dtStart = `${y}${m}${d}T${hour}0000`;
+    const dtEnd   = `${y}${m}${d}T${hour}3000`; // 30 mins
+
+    let desc = `${note} \\nContact/Time: ${phone}`;
+    
+    // Recurrence logic
+    let rruleLine = "";
+    if(data.type === "med" && data.rrule){
+      // Meds = Infinite (or user manually stops)
+      rruleLine = `RRULE:FREQ=${data.rrule}`;
+    } else if(data.type === "check"){
+      // Checks = Monthly x Count
+      rruleLine = `RRULE:FREQ=MONTHLY;COUNT=${monthlyCount}`;
+    }
+
+    events.push(`BEGIN:VEVENT
+SUMMARY:${data.title}
 DTSTART:${dtStart}
 DTEND:${dtEnd}
 DESCRIPTION:${desc}
+${rruleLine}
 STATUS:CONFIRMED
 END:VEVENT`);
-    }
   });
 
   if(events.length === 0) return null;
