@@ -179,8 +179,9 @@ button.primary:active{ transform:translateY(1px); }
 <div class="container">
   <h1>Health Reminders</h1>
   <div class="subtitle">
-    Review your suggested plan below. Uncheck any items you don't need.<br/>
-    <b>Screenings</b> are staggered to avoid crowding a single day.
+    Review your suggested plan below.<br/>
+    <b>Medications</b> are optional (unchecked by default).<br/>
+    <b>Screenings</b> are staggered to avoid crowding your calendar.
   </div>
 
   <div class="config-bar">
@@ -332,9 +333,12 @@ function render(){
     if(data.type === "med") badgeHtml = `<span class="item-badge med">Med (${data.rrule})</span>`;
     else badgeHtml = `<span class="item-badge check">To-Do</span>`;
     
+    // Default checked state: Meds = Unchecked, Checks = Checked
+    const isChecked = (data.type === "med") ? "" : "checked";
+
     div.innerHTML = `
       <div class="chk-wrap">
-        <input type="checkbox" class="chk" id="chk_${key}" checked />
+        <input type="checkbox" class="chk" id="chk_${key}" ${isChecked} />
       </div>
       <div class="details">
         <div class="item-head">
@@ -382,8 +386,10 @@ function generateICS(){
   const events = [];
   const monthlyCount = $("repeat_count").value || 4;
   
-  // Strategy: Stagger screenings by 1 day each so they don't pile up.
-  // Meds always start "Tomorrow".
+  // Strategy: 
+  // Meds start Tomorrow. AM = 08:00, PM = 20:00.
+  // Checks start Tomorrow. Staggered by day. 10:00.
+  
   let staggerOffset = 0;
 
   const checkboxes = document.querySelectorAll(".chk");
@@ -413,9 +419,15 @@ function generateICS(){
     const m = String(now.getMonth()+1).padStart(2,'0');
     const d = String(now.getDate()).padStart(2,'0');
     
-    // Time logic
-    let hour = "09";
-    if(key.includes("pm")) hour = "21"; // 9 PM
+    // Time logic to prevent "all on a line"
+    // Meds: 08:00 (AM) or 20:00 (PM)
+    // Checks: 10:00
+    let hour = "10"; 
+    
+    if(data.type === "med"){
+      if(key.includes("pm")) hour = "20"; // 8 PM
+      else hour = "08"; // 8 AM
+    }
     
     const dtStart = `${y}${m}${d}T${hour}0000`;
     const dtEnd   = `${y}${m}${d}T${hour}3000`; // 30 mins
